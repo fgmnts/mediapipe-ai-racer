@@ -2,7 +2,7 @@ import "./style.css";
 
 import { HandLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 // import * as tasksVision from "@mediapipe/tasks-vision/wasm";
-
+// console.log("imported tasksVision", tasksVision);
 const demosSection = document.getElementById("demos");
 let handLandmarker = undefined;
 let runningMode = "IMAGE";
@@ -981,7 +981,9 @@ function refreshTweakUI() {
 /** RACER END */
 
 const createHandLandmarker = async () => {
-  const vision = await FilesetResolver.forVisionTasks("./wasm");
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+  );
 
   handLandmarker = await HandLandmarker.createFromOptions(vision, {
     baseOptions: {
@@ -994,6 +996,9 @@ const createHandLandmarker = async () => {
   demosSection.classList.remove("invisible");
 };
 createHandLandmarker();
+
+const image = document.getElementById("steering_wheel");
+console.log(image);
 
 // const image = document.getElementById("source");
 // console.log(image);
@@ -1073,11 +1078,11 @@ function calculateDistance(point1, point2) {
   return Math.sqrt(xDiff * xDiff + yDiff * yDiff);
 }
 
-let previousWristY = null;
+let previousThumbTipY = null;
 // Function to detect the gesture
 function detectGestureLeftHand(landmarks) {
   //   const thumbTip = landmarks[4];
-  const wrist = landmarks[0];
+  const thumbTip = landmarks[4];
   // Calculate the distance between thumb tip and index finger tip
   //   const distance = calculateDistance(thumbTip, wrist);
   // Check if thumb and index finger are touching (you might need to adjust the threshold)
@@ -1085,16 +1090,16 @@ function detectGestureLeftHand(landmarks) {
   const _d = 0.1;
   // Check if they are moving downwards
   const isMovingDownwards =
-    previousWristY !== null && wrist.y > _d + previousWristY;
+    previousThumbTipY !== null && thumbTip.y > _d + previousThumbTipY;
   // Update previous positions
-  console.log({
-    //     distance,
-    //     areTouching,
-    //     previousWristY,
-    WristX: wrist.x,
-    //     diff: previousWristY ? wrist.y - previousWristY : "-",
-  });
-  previousWristY = wrist.y;
+  // console.log({
+  //     distance,
+  //     areTouching,
+  //     previousThumbTipY,
+  // WristX: thumbTip.x,
+  //     diff: previousThumbTipY ? wrist.y - previousThumbTipY : "-",
+  // });
+  previousThumbTipY = thumbTip.y;
   // Set gesture detected flag
   return areTouching && isMovingDownwards;
 }
@@ -1171,9 +1176,9 @@ async function predictWebcam() {
       });
       //   console.log({ handType });
       drawLandmarks(canvasCtx, landmarks, { color: "#FF0000", lineWidth: 2 });
-      if (landmarks[0].x < 0.5) {
+      if (landmarks[4].x < 0.5) {
         // right hand
-        rightHandY = landmarks[0].y;
+        rightHandY = landmarks[4].y;
 
         // // Detect gesture
         // const gestureDetected = detectGestureRightHand(landmarks);
@@ -1192,9 +1197,9 @@ async function predictWebcam() {
         // }
       } else {
         // Left Hand
-        leftHandY = landmarks[0].y;
+        leftHandY = landmarks[4].y;
 
-        // if (landmarks[0].x < 0.75) {
+        // if (landmarks[4].x < 0.75) {
         //   tone = "LOW";
         // } else {
         //   tone = "HIGH";
@@ -1208,7 +1213,7 @@ async function predictWebcam() {
     let diff = 0;
     if (rightHandY && leftHandY) diff = Math.abs(rightHandY - leftHandY);
 
-    if (diff > 0.3) {
+    if (diff > 0.15) {
       if (rightHandY > leftHandY) {
         direction = "right";
         keyRight = true;
@@ -1218,20 +1223,6 @@ async function predictWebcam() {
         keyLeft = true;
         keyRight = false;
       }
-
-      canvasCtx.translate(
-        canvasElement.width * 0.5,
-        canvasElement.height * 0.5
-      );
-
-      // flip context horizontally, because webcam image is mirrored
-      canvasCtx.scale(-1, 1);
-
-      //flames &&
-      canvasCtx.textAlign = "center";
-
-      canvasCtx.font = "120px Arial";
-      canvasCtx.fillText(keyLeft ? "L" : "R", 0, 0);
     } else {
       keyLeft = false;
       keyRight = false;
@@ -1239,6 +1230,47 @@ async function predictWebcam() {
     keyFaster = true;
 
     console.log({ rightHandY, leftHandY, direction, diff });
+
+    const angleInRadians = keyLeft ? 1.3 : keyRight ? -1.3 : 0;
+    canvasCtx.translate(canvasElement.width * 0.5, canvasElement.height * 0.5);
+
+    canvasCtx.rotate(angleInRadians);
+    var width = canvasElement.width * 0.5;
+    var height = canvasElement.height * 0.5;
+
+    canvasCtx.drawImage(
+      image,
+      -width / 2,
+      -height / 2,
+      width,
+      height
+      // canvasElement.width * 0.25,
+      // canvasElement.height * 0.25,
+      // canvasElement.width * 0.5,
+      // canvasElement.height * 0.5
+    );
+
+    canvasCtx.rotate(-angleInRadians);
+    // canvasCtx.translate(
+    //   -1 * canvasElement.width * 0.5,
+    //   -1 * canvasElement.height * 0.5
+    // );
+
+    if (keyLeft || keyRight) {
+      // canvasCtx.translate(
+      //   canvasElement.width * 0.5,
+      //   canvasElement.height * 0.5
+      // );
+
+      // flip context horizontally, because webcam image is mirrored
+      canvasCtx.scale(-1, 1);
+
+      //flames &&
+      canvasCtx.textAlign = "center";
+      canvasCtx.fillStyle = "red";
+      canvasCtx.font = "120px Arial";
+      canvasCtx.fillText(keyLeft ? "L" : "R", 0, 0);
+    }
   } else {
     keyLeft = false;
     keyRight = false;
